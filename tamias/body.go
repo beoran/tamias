@@ -162,7 +162,8 @@ func BodyAlloc() (* Body) {
 
 
 func (body *Body) Init(m Float, i Float) (*Body) {
-	/* Compiler doesnt' seem to support these yet.
+	/* Compiler doesn't seem to support these yet, 
+	or maybe I misunderstood the syntax?
 	body.velocityFunc = Body.UpdateVelocity
 	body.positionFunc = Body.UpdatePosition
 	*/

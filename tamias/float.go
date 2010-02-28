@@ -85,5 +85,9 @@ func (f1 Float) Flerpconst(f2 Float, d Float) (Float) {
   return f1 + (f2 - f1).Clamp(-d, d)
 }
 
+func (a Float) VectForAngle() (Vect) {
+  return V(a.Cos(), a.Sin())
+}
+
 var INFINITY = Float(math.Inf(1))
 

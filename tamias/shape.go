@@ -1,8 +1,8 @@
 package tamias
 
-type struct SegmentQueryInfo {
-  // shape that was hit, NULL if no collision
-  shape * Shape  
+type SegmentQueryInfo struct {
+  // shape that was hit, nil if no collision
+  shape * Shape
   // Distance along query segment, will always be in the range [0, 1].
   t Float
   // normal of hit surface
@@ -19,29 +19,32 @@ type HashValue int
 type ShapeType int
 
 const (
-  CP_CIRCLE_SHAPE	= ShapeType(0)
-  CP_SEGMENT_SHAPE	= ShapeType(1)
-  CP_POLY_SHAPE		= ShapeType(2)
-  CP_NUM_SHAPES		= ShapeType(3)
-  CP_NO_GROUP		= GroupType(0)  
+  CIRCLE_SHAPE	= ShapeType(0)
+  SEGMENT_SHAPE	= ShapeType(1)
+  POLY_SHAPE		= ShapeType(2)
+  NUM_SHAPES		= ShapeType(3)
+  NO_GROUP		  = GroupType(0)  
 )  
 
 const (
-  CP_LAYER_0		= 1 << iota
-  CP_LAYER_1		= 1 << iota
-  CP_LAYER_2		= 1 << iota
-  CP_LAYER_3		= 1 << iota
-  CP_LAYER_4		= 1 << iota
-  CP_LAYER_5		= 1 << iota
-  CP_LAYER_6		= 1 << iota
-  CP_LAYER_7		= 1 << iota
-  CP_LAYER_8		= 1 << iota
-  CP_LAYER_9		= 1 << iota
-  CP_LAYER_10		= 1 << iota
-  CP_LAYER_11		= 1 << iota
-  CP_LAYER_12		= 1 << iota
-  CP_LAYER_13		= 1 << iota
-  CP_ALL_LAYERS		= -1
+  LAYER_0		  = 1 << iota
+  LAYER_1		  = 1 << iota
+  LAYER_2		  = 1 << iota
+  LAYER_3		  = 1 << iota
+  LAYER_4		  = 1 << iota
+  LAYER_5		  = 1 << iota
+  LAYER_6		  = 1 << iota
+  LAYER_7		  = 1 << iota
+  LAYER_8		  = 1 << iota
+  LAYER_9		  = 1 << iota
+  LAYER_10		= 1 << iota
+  LAYER_11		= 1 << iota
+  LAYER_12		= 1 << iota
+  LAYER_13		= 1 << iota
+  LAYER_14    = 1 << iota
+  LAYER_15    = 1 << iota
+  LAYER_16    = 1 << iota 
+  ALL_LAYERS	= -1
 )
 
 
@@ -93,15 +96,6 @@ type CircleShape struct {
   tc Vect;
 } 
 
-func (shape * CircleShape) Radius() (Float) {
-  return shape.r
-}
-
-func (shape * CircleShape) Offset() (Float) {
-  // return shape.
-}
-
-
 // Segment shape structure.
 type SegmentShape struct {
   * Shape
@@ -113,41 +107,50 @@ type SegmentShape struct {
   ta, tb, tn Vect
 } 
 
-(info *SegmentQuery) HitPoint(cpVect start, cpVect end) (Vect) {
+// Returns true if a shape was hit, false if not
+func (info *SegmentQueryInfo) Hit() (bool) {
+  return info.shape != nil 
+}
+
+
+func (info *SegmentQueryInfo) HitPoint(start, end Vect) (Vect) {
 	return start.Lerp(end, info.t) 
 }
 
-(info *SegmentQuery) HitDist(cpVect start, cpVect end) (Float) {
-	return start.Dist(start, end) * info.t
+func (info *SegmentQueryInfo) HitDist(start Vect, end Vect) (Float) {
+	return start.Dist(end) * info.t
 }
 
 var ( 
-  SHAPE_ID_COUNTER := HashValue(0)
+  SHAPE_ID_COUNTER HashValue = HashValue(0)
 )  
 
 func ResetShapeIdCounter() {
 	SHAPE_ID_COUNTER = HashValue(0)
 }
 
-func (shape * Shape) Init(klass *ShapeClass, cpbody *Body)
-{
-	shape.ShapeClass = klass;	
-	shape.hashid 	 = SHAPE_ID_COUNTER
+func (shape * Shape) Init(klass *ShapeClass, body *Body) (*Shape){
+	shape.ShapeClass = klass	
+	shape.hashid 	   = SHAPE_ID_COUNTER
 	SHAPE_ID_COUNTER++	
 	
-	shape.body 	= body;
-	shape.sensor 	= 0;
+	shape.Body 	     = body
+	shape.sensor 	   = false
 	
-	shape.e 	= Float(0.0)
-	shape.u 	= Float(0.0f)
-	shape.surface_v = VZERO
+	shape.e 	       = Float(0.0)
+	shape.u 	       = Float(0.0)
+	shape.surface_v  = VZERO
 	
 	shape.collision_type 	= 0
-	shape.group 		= CP_NO_GROUP
-	shape.layers 		= CP_ALL_LAYERS
-	shape.data 		= nil	
-	shape.CacheBB()	
+	shape.group 		= NO_GROUP
+	shape.layers 		= ALL_LAYERS
+	shape.data 		  = nil	
+	shape.CacheBB(body.p, body.rot)	
 	return shape;
+}
+
+func (shape * Shape) CacheBB(p Vect, rot Vect) (BB) {
+  return BBNew(p.X, p.Y, p.X, p.Y)
 }
 
 func (shape * Shape) Destroy() {
@@ -196,23 +199,22 @@ cpSegmentQueryInfoPrint(cpSegmentQueryInfo *info)
 
 
 
-func CircleShapeAlloc() (* cpCircleShape) {
-	return &cpCircleShape{};
+func CircleShapeAlloc() (* CircleShape) {
+	return &CircleShape{};
 }
 
  
-func bbFromCircle(c Vect, r Float) (BB)
-{
-	return BBNew(c.x-r, c.y-r, c.x+r, c.y+r);
+func bbFromCircle(c Vect, r Float) (BB) {
+	return BBNew(c.X-r, c.Y-r, c.X+r, c.Y+r);
 }
 
-func (circle * Circle) CacheBB(p Vect, rot Vect) (BB) {
+func (circle * CircleShape) CacheBB(p Vect, rot Vect) (BB) {
   circle.tc	=	p.Add(circle.c.Rotate(rot))
   return bbFromCircle(circle.tc, circle.r)
 }
 
-func (circle * Circle) PointQuery(cpVect p) (bool) {	
-	return circle->tc.Near(p, circle->r)
+func (circle * CircleShape) PointQuery(p Vect) (bool) {	
+	return circle.tc.Near(p, circle.r)
 }
 
 
@@ -226,80 +228,80 @@ func CircleSegmentQuery(shape *Shape, center Vect, r Float, a, b Vect) (info * S
 	qb := Float(-2.0)*aa.Dot(aa) + Float(2.0)*aa.Dot(bb)
 	qc := aa.Dot(aa) - r*r;
 	
-	det:= qb*qb - Float(4.)0*qa*qc;
-	info= &SeqmentQueryInfo{}	
+	det:= qb*qb - Float(4.0)*qa*qc
+	info= &SegmentQueryInfo{}	
 	if det >= Float(0.0) {
 		t := (-qb - det.Sqrt())/(Float(2.0)*qa);
-		if Float(0.0)<= t && t <= Float(1.0) { 
-			info->shape = shape;
-			info->t = t;
-			info->n = a.Lerp(b, t).Normalize()
+		if Float(0.0) <= t && t <= Float(1.0) { 
+			info.shape = shape
+			info.t = t
+			info.n = a.Lerp(b, t).Normalize()
 		}
 	}
   return info 
 }
 
 
-func (circle * Circle) SegmentQuery(a, b Vect) (info * SegmentQueryInfo) {
-  return CircleSegmentQuery(circle, circle.c, cicle.r, a, b)
+func (circle * CircleShape) SegmentQuery(a, b Vect) (info * SegmentQueryInfo) {
+  return CircleSegmentQuery(circle.Shape, circle.c, circle.r, a, b)
 }
 
-const CircleShapeClass = ShapeClass { CP_CIRCLE_SHAPE }
+var CircleShapeClass *ShapeClass = &ShapeClass{ CIRCLE_SHAPE }
 
 
-func (circle * CircleShape) Init(cpBody *body, cpFloat radius, cpVect offset) (* CircleShape) {
+func (circle * CircleShape) Init(body * Body, radius Float, offset Vect) (* CircleShape) {
 	circle.c = offset;
 	circle.r = radius;	
-	Shape.Init(circle, CircleShapeClass, body);	
+	circle.Shape.Init(CircleShapeClass, body);	
 	return circle;
 }
 
 
-func CircleShapeNew(radius Float, offset Vect) (*CircleShape) {
-  return CircleShapeAlloc().Init(radius, offset)
+func CircleShapeNew(body * Body, radius Float, offset Vect) (*CircleShape) {
+  return CircleShapeAlloc().Init(body, radius, offset)
 }
 
 func (circle * CircleShape) Radius() (Float) {
-  return circle.radius
+  return circle.r
 }
 
 func (circle * CircleShape) Offset() (Vect) {
-  return circle.offset
+  return circle.c
 }
 
 func SegmentShapeAlloc() (*SegmentShape) {
   return &SegmentShape{}
 }
 
-(seg * SegmentShape) CacheBB(p, rot Vect) (BB) {
-  l, r, s, t Float
+func (seg * SegmentShape) CacheBB(p, rot Vect) (BB) {
+  var l, r, s, t Float
   
   seg.ta = p.Add(seg.a.Rotate(rot));
   seg.tb = p.Add(seg.b.Rotate(rot));
   seg.tn = p.Add(seg.n.Rotate(rot));
     
-  if(seg.ta.x < seg.tb.x){
-    l = seg.ta.x
-    r = seg.tb.x
+  if(seg.ta.X < seg.tb.X){
+    l = seg.ta.X
+    r = seg.tb.X
   } else {
-    l = seg.tb.x
-    r = seg.ta.x
+    l = seg.tb.X
+    r = seg.ta.X
   }
   
-  if(seg.ta.y < seg.tb.y){
-    s = seg.ta.y
-    t = seg.tb.y
+  if(seg.ta.Y < seg.tb.Y){
+    s = seg.ta.Y
+    t = seg.tb.Y
   } else {
-    s = seg.tb.y
-    t = seg.ta.y
+    s = seg.tb.Y
+    t = seg.ta.Y
   }
   
-  rad := seg->r
+  rad := seg.r
   return BBNew(l - rad, s - rad, r + rad, t + rad)
 }
 
-(seg * SegmentShape) PointQuery(p Vect) (bool) {
-  if !seg.bb.ContainsVect(p) { 
+func (seg * SegmentShape) PointQuery(p Vect) (bool) {
+  if !seg.BB.ContainsVect(p) { 
     return false 
   } 
    
@@ -317,7 +319,7 @@ func SegmentShapeAlloc() (*SegmentShape) {
   
   // Decision tree to decide which feature of the segment to collide with.
   if dt <= dtMin {
-    if dt < (dtMin - seg->r) {
+    if dt < (dtMin - seg.r) {
       return false
     } else {
       return seg.ta.Sub(p).Lengthsq() < (seg.r * seg.r) 
@@ -326,7 +328,7 @@ func SegmentShapeAlloc() (*SegmentShape) {
     if dt < dtMax {
       return true;
     } else {
-      if dt < (dtMax + seg->r) {
+      if dt < (dtMax + seg.r) {
         return seg.tb.Sub(p).Lengthsq() < (seg.r * seg.r)
       } else {
         return false
@@ -337,12 +339,12 @@ func SegmentShapeAlloc() (*SegmentShape) {
 }
 
 
-func (segment * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * SegmentQueryInfo) {
+func (seg * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * SegmentQueryInfo) {
   
   n := seg.tn;
   // flip n if a is behind the axis
   if a.Dot(n) < seg.ta.Dot(n) { 
-    n := n.Neg()
+    n = n.Neg()
   }  
   
   info = &SegmentQueryInfo{}
@@ -351,15 +353,14 @@ func (segment * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * Segme
   d   := seg.ta.Dot(n) + seg.r
   t   := (d - an)/(bn - an)
   
-  if  Float(0.0) < t && t < Float(1.0f) {
-    
+  if Float(0.0) < t && t < Float(1.0) {    
     point := a.Lerp(b,t)
     dt    := - seg.tn.Cross(point)
     dtMin := - seg.tn.Cross(seg.ta)
     dtMax := - seg.tn.Cross(seg.tb)
         
     if(dtMin < dt && dt < dtMax){
-      info.shape = shape;
+      info.shape = seg.Shape
       info.t = t;
       info.n = n;
       
@@ -367,15 +368,15 @@ func (segment * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * Segme
     }
   }
   
-  if seg.r {
-    info1 := circleSegmentQuery(shape, seg->ta, seg->r, a, b)
-    info2 := circleSegmentQuery(shape, seg->tb, seg->r, a, b)
+  if seg.r > 0.0 {
+    info1 := CircleSegmentQuery(seg.Shape, seg.ta, seg.r, a, b)
+    info2 := CircleSegmentQuery(seg.Shape, seg.tb, seg.r, a, b)
     
-    if info1.shape && !info2.shape {
+    if info1.Hit() && !info2.Hit() {
       info = info1
-    } else if info2.shape && !info1.shape {
+    } else if info2.Hit() && !info1.Hit() {
       info = info2
-    } else if info1.shape && info2.shape {
+    } else if info1.Hit() && info2.Hit() {
       if info1.t < info2.t {
         info = info1;
       } else {
@@ -388,19 +389,19 @@ func (segment * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * Segme
 }
 
 
-var SegmentShapeClass = &ShapeClass {SEGMENT_SHAPE}
+var SegmentShapeClass * ShapeClass = &ShapeClass {SEGMENT_SHAPE}
 
 func (seg *SegmentShape) Init(body * Body, a, b Vect, r Float) (*SegmentShape) {
   seg.a = a
   seg.b = b
   seg.n = b.Sub(a).Normalize().Perp()
   seg.r = r;  
-  Shape.Init(seg, SegmentShapeClass, body)  
+  seg.Shape.Init(SegmentShapeClass, body)  
   return seg;
 }
 
 func SegmentShapeNew(body * Body, a, b Vect, r Float) (*SegmentShape) {
-  SegmentShapeAlloc().Init(body, a, b, r)
+  return SegmentShapeAlloc().Init(body, a, b, r)
 }
 
 func (seg * SegmentShape) A() (Vect) {
@@ -435,7 +436,7 @@ func (circle * CircleShape) SetOffset(o Vect) (Vect) {
 func (seg * SegmentShape) Setendpoints(a, b Vect) {
   seg.a = a
   seg.b = b
-  seg.n = b.Sub(a).Normalize.Perp()
+  seg.n = b.Sub(a).Normalize().Perp()
 }
 
 func (seg * SegmentShape) SetRadius(r Float) (Float) {

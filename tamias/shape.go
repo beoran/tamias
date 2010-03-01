@@ -13,7 +13,6 @@ type SegmentQueryInfo struct {
 type CollisionType int
 type GroupType int
 type LayerType int
-type HashValue int
 
 // Enumeration of shape types.
 type ShapeType int
@@ -443,5 +442,6 @@ func (seg * SegmentShape) SetRadius(r Float) (Float) {
   seg.r = r
   return seg.r
 }
+
 
 

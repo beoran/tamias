@@ -37,30 +37,31 @@ typedef struct cpSpaceHash{
   
   // Hashset of the handles and the recycled ones.
   handleSet     []HashSet
-  pooledHandles []HashSet
+  pooledHandles Array
   
   // The table and the recycled bins.
   table         []*SpaceHashBin
   pooledBins    Array
   
+  allocatedBuffers Array
     
   // Incremented on each query. See cpHandle.stamp.
   stamp int
 } 
 
-(hand *Handle) Init(obj * SpaceHashElement) (*Handle) { 
+func (hand *Handle) Init(obj * SpaceHashElement) (*Handle) { 
   hand.obj    = obj
   hand.retain = 0
   hand.stamp  = 0
   return hand
 }
 
-(hand *Handle) Retain() { 
+func (hand *Handle) Retain() { 
   hand.retain++
 }
 
 
-(hand *Handle) Release(pooledHandles * Array) {
+func (hand *Handle) Release(pooledHandles * Array) {
   hand.retain--
   if hand.retain < 1 { 
     pooledHandles.Push(hand)
@@ -68,49 +69,30 @@ typedef struct cpSpaceHash{
 }
 
 
-cpHandleRelease(cpHandle *hand, cpArray *pooledHandles)
-{
-  hand.retain--
-  if(hand.retain == 0) cpArrayPush(pooledHandles, hand)
+func SpaceHashAlloc() (*SpaceHash) {
+  return &SpaceHash{}
 }
 
-cpSpaceHash*
-cpSpaceHashAlloc(void)
-{
-  return (cpSpaceHash *)cpcalloc(1, sizeof(cpSpaceHash))
-}
-
-// Frees the old table, and allocates a new one.
-static void
-cpSpaceHashAllocTable(cpSpaceHash *hash, int numcells)
-{
-  cpfree(hash.table)
-  
+func (hash * SpaceHash) AllocTable(int numcells) {
   hash.numcells = numcells
-  hash.table = (cpSpaceHashBin **)cpcalloc(numcells, sizeof(cpSpaceHashBin *))
-}
+  hash.table = make([]*SpaceHashBin, numcells)
+} 
 
 // Equality function for the handleset.
-static int
-handleSetEql(void *obj, void *elt)
-{
-  cpHandle *hand = (cpHandle *)elt
-  return (obj == hand.obj)
+func (handle * Handle) Equals(other * Handle) (bool) {  
+  return (hand.obj == other.obj)
 }
 
 // Transformation function for the handleset.
-static void *
-handleSetTrans(void *obj, cpSpaceHash *hash)
+func (handle *Handle) handleSetTrans (hash * SpaceHash)
 {
   if(hash.pooledHandles.num == 0){
-    // handle pool is exhausted, make more
-    int count = CP_BUFFER_BYTES/sizeof(cpHandle)
-    cpAssert(count, "Buffer size is too small.")
-    
-    cpHandle *buffer = (cpHandle *)cpmalloc(CP_BUFFER_BYTES)
-    cpArrayPush(hash.allocatedBuffers, buffer)
-    
-    for(int i=0; i<count; i++) cpArrayPush(hash.pooledHandles, buffer + i)
+    // handle pool is exhausted, make more    
+    count 	:= 100    
+    buffer 	:= make([]Handle, count)
+    for int i=0; i<count; i++ { 
+      hash.pooledHandles.Push(buffer[i])
+    }  
   }
   
   cpHandle *hand = cpHandleInit(cpArrayPop(hash.pooledHandles), obj)
@@ -119,218 +101,172 @@ handleSetTrans(void *obj, cpSpaceHash *hash)
   return hand
 }
 
-cpSpaceHash*
-cpSpaceHashInit(cpSpaceHash *hash, cpFloat celldim, int numcells, cpSpaceHashBBFunc bbfunc)
-{
-  cpSpaceHashAllocTable(hash, next_prime(numcells))
-  hash.celldim = celldim
-  hash.bbfunc = bbfunc
+func (hash *SpaceHash) Init(celldim Float, numcells int) (* SpaceHash) {
+  hash.AllocTable(next_prime(numcells))  
+  hash.celldim 		= celldim
+ 
+  hash.handleSet     	= HashSetNew(0) 
+  hash.pooledHandles 	= ArrayNew(0)
   
-  hash.handleSet = cpHashSetNew(0, handleSetEql, (cpHashSetTransFunc)handleSetTrans)
-  hash.pooledHandles = cpArrayNew(0)
+  hash.pooledBins    	= nil
+  hash.allocatedBuffers = ArrayNew(0)
   
-  hash.pooledBins = NULL
-  hash.allocatedBuffers = cpArrayNew(0)
-  
-  hash.stamp = 1
-  
+  hash.stamp 		= 1  
   return hash
 }
 
-cpSpaceHash*
-cpSpaceHashNew(cpFloat celldim, int cells, cpSpaceHashBBFunc bbfunc)
-{
-  return cpSpaceHashInit(cpSpaceHashAlloc(), celldim, cells, bbfunc)
+func SpaceHashNew(celldim Float, numcells int) (* SpaceHash) { 
+  return SpaceHashAlloc().Init(celldim, numcells)
 }
 
-static inline void
-recycleBin(cpSpaceHash *hash, cpSpaceHashBin *bin)
-{
-  bin.next = hash.pooledBins
+func (hash * SpaceHash) recycleBin(SpaceHashBin *bin) {
+  bin.next 	  = hash.pooledBins
   hash.pooledBins = bin
 }
 
-static inline void
-clearHashCell(cpSpaceHash *hash, int idx)
-{
-  cpSpaceHashBin *bin = hash.table[idx]
-  while(bin){
-    cpSpaceHashBin *next = bin.next
-    
-    // Release the lock on the handle.
-    cpHandleRelease(bin.handle, hash.pooledHandles)
-    recycleBin(hash, bin)
-    
-    bin = next
+func (hash * SpaceHash) clearHashCell(int idx) {
+  bin := hash.table[idx]
+  for bin { 
+    next := bin.next
+    bin.handle.Release(hash.pooledHandles)
+    hash.recycleBin(bin)
+    bin   = next
   }
-  
-  hash.table[idx] = NULL
+  hash.table[idx] = nil
 }
 
 // Clear all cells in the hashtable.
-static void
-clearHash(cpSpaceHash *hash)
-{
-  for(int i=0; i<hash.numcells; i++)
-    clearHashCell(hash, i)
+func (hash * SpaceHash) clearHash() { 
+  for int i=0; i<hash.numcells; i++ {  
+    hash.clearHashCell(i)
+  }  
 }
 
-static void freeWrap(void *ptr, void *unused){cpfree(ptr);}
-
-void
-cpSpaceHashDestroy(cpSpaceHash *hash)
-{
-  clearHash(hash)
+func (hash * SpaceHash) Destroy() { 
+  hash.clearHash()
+  hash.handleSet.free()
   
-  cpHashSetFree(hash.handleSet)
-  
-  cpArrayEach(hash.allocatedBuffers, freeWrap, NULL)
-  cpArrayFree(hash.allocatedBuffers)
-  cpArrayFree(hash.pooledHandles)
-  
-  cpfree(hash.table)
+  hash.allocatedBuffers = nil
+  hash.pooledHandles	= nil  
+  hash.table		= nil
 }
 
-void
-cpSpaceHashFree(cpSpaceHash *hash)
-{
-  if(hash){
-    cpSpaceHashDestroy(hash)
-    cpfree(hash)
-  }
-}
+func (hash * SpaceHash) Free() { 
+  hash.Destroy()  
+}  
 
-void
-cpSpaceHashResize(cpSpaceHash *hash, cpFloat celldim, int numcells)
-{
+
+func (hash * SpaceHash) Resize(celdim Float, numcells int) { 
   // Clear the hash to release the old handle locks.
-  clearHash(hash)
-  
+  hash.clearHash()  
   hash.celldim = celldim
-  cpSpaceHashAllocTable(hash, next_prime(numcells))
+  hash.AllocTable(next_prime(numcells))
 }
 
 // Return true if the chain contains the handle.
-static inline int
-containsHandle(cpSpaceHashBin *bin, cpHandle *hand)
-{
-  while(bin){
-    if(bin.handle == hand) return 1
+func (bin *SpaceHashBin) containsHandle(hand *Handle) (bool) {
+  if bin != nil {
+    if (bin.handle == hand) return true
     bin = bin.next
-  }
-  
-  return 0
+  }  
+  return false
 }
 
 // Get a recycled or new bin.
-static inline cpSpaceHashBin *
-getEmptyBin(cpSpaceHash *hash)
-{
-  cpSpaceHashBin *bin = hash.pooledBins
+func (hash * SpaceHashBin) getEmptyBin() (bin * SpaceHashBin) {
+  bin := hash.pooledBins
   
-  if(bin){
+  if bin != nil {
     hash.pooledBins = bin.next
     return bin
   } else {
     // Pool is exhausted, make more
-    int count = CP_BUFFER_BYTES/sizeof(cpSpaceHashBin)
-    cpAssert(count, "Buffer size is too small.")
-    
-    cpSpaceHashBin *buffer = (cpSpaceHashBin *)cpmalloc(CP_BUFFER_BYTES)
-    cpArrayPush(hash.allocatedBuffers, buffer)
+    buffer := make([]SpaceHashBin, 100)
+    hash.allocatedBuffers.Push(buffer)
     
     // push all but the first one, return the first instead
-    for(int i=1; i<count; i++) recycleBin(hash, buffer + i)
-    return buffer
+    for  i:=1; i<count; i++ { 
+      hash.recycleBin(&buffer[i])
+    }  
+    return &buffer[0]
   }
 }
 
 // The hash function itself.
-static inline cpHashValue
-hash_func(cpHashValue x, cpHashValue y, cpHashValue n)
-{
-  return (x*1640531513ul ^ y*2654435789ul) % n
+func hash_func(x, y, n HashValue) (HashValue) {
+  return (x*1640531513 ^ y*2654435789) % n
 }
 
 // Much faster than (int)floor(f)
 // Profiling showed floor() to be a sizable performance hog
-static inline int
-floor_int(cpFloat f)
-{
-  int i = (int)f
-  return (f < 0.0f && f != i ? i - 1 : i)
+// XXX: check this for golang.
+func (Float f) floor_int() (int) {                                 
+  i := int(f)
+  if f < Float(0.0) && f != Float(i) { 
+    return i - 1
+  }
+  return i 
 }
 
-static inline void
-hashHandle(cpSpaceHash *hash, cpHandle *hand, cpBB bb)
-{
+func (hash * SpaceHash) hashHandle(hand * Handle, bb BB) 
   // Find the dimensions in cell coordinates.
-  cpFloat dim = hash.celldim
-  int l = floor_int(bb.l/dim); // Fix by ShiftZ
-  int r = floor_int(bb.r/dim)
-  int b = floor_int(bb.b/dim)
-  int t = floor_int(bb.t/dim)
+  dim 	:= hash.celldim
+  // Fix by ShiftZ
+  l := floor_int(bb.l / dim)
+  r := floor_int(bb.r / dim)
+  b := floor_int(bb.b / dim)
+  t := floor_int(bb.t / dim)
   
-  int n = hash.numcells
-  for(int i=l; i<=r; i++){
-    for(int j=b; j<=t; j++){
-      int idx = hash_func(i,j,n)
-      cpSpaceHashBin *bin = hash.table[idx]
+  n := hash.numcells
+  for  i:=l ;  i<=r; i++ {
+    for j:=b ; j<=t ; j++ {
+      idx := hash_func(HashValue(i), HashValue(j), HashValue(n))
+      bin := hash.table[idx]
       
       // Don't add an object twice to the same cell.
-      if(containsHandle(bin, hand)) continue
-
-      cpHandleRetain(hand)
+      if bin.containsHandle(hand) { continue; }
+      hand.Retain()
+      
       // Insert a new bin for the handle in this cell.
-      cpSpaceHashBin *newBin = getEmptyBin(hash)
-      newBin.handle = hand
-      newBin.next = bin
-      hash.table[idx] = newBin
+      newBin 		:= hash.getEmptyBin()
+      newBin.handle 	= hand
+      newBin.next 	= bin
+      hash.table[idx] 	= newBin
     }
   }
 }
 
-void
-cpSpaceHashInsert(cpSpaceHash *hash, void *obj, cpHashValue hashid, cpBB bb)
-{
-  cpHandle *hand = (cpHandle *)cpHashSetInsert(hash.handleSet, hashid, obj, hash)
-  hashHandle(hash, hand, bb)
+func (hash * SpaceHash) Insert(hand * Handle, obj * HashElement,  bb BB) {
+  hand := hash.handleSet.Insert(hashid, obj, hash)
+  hash.hashHandle(hand, bb)
 }
 
-void
-cpSpaceHashRehashObject(cpSpaceHash *hash, void *obj, cpHashValue hashid)
-{
-  cpHandle *hand = (cpHandle *)cpHashSetFind(hash.handleSet, hashid, obj)
-  hashHandle(hash, hand, hash.bbfunc(obj))
+func (hash * SpaceHash) Insert(obj * HashElement,  hashid HashValue) {
+  hand := hash.handleSet.find(hashid, obj)
+  hash.hashHandle(hand, obj.GetBB())
 }
+
+func (hash * SpaceHash) RehashObject(obj * HashElement,  hashid HashValue) {
+  hand := hash.handleSet.find(hashid, obj)
+  hash.hashHandle(hand, obj.GetBB())
+} 
 
 // Hashset iterator function for rehashing the spatial hash. (hash hash hash hash?)
-static void
-handleRehashHelper(void *elt, void *data)
-{
-  cpHandle *hand = (cpHandle *)elt
-  cpSpaceHash *hash = (cpSpaceHash *)data
-  
-  hashHandle(hash, hand, hash.bbfunc(hand.obj))
+func handleRehashHelper(hand * Handle, hash * SpaceHash) {
+  hash.hashHandle(hash, hand, hand.obj.GetBB())
 }
 
-void
-cpSpaceHashRehash(cpSpaceHash *hash)
-{
-  clearHash(hash)
-  
+func (cpSpaceHash *hash) Rehash() {
+  clearHash(hash)  
   // Rehash all of the handles.
-  cpHashSetEach(hash.handleSet, &handleRehashHelper, hash)
+  hash.handleSet.Each(handleRehashHelper, hash)
 }
 
-void
-cpSpaceHashRemove(cpSpaceHash *hash, void *obj, cpHashValue hashid)
-{
-  cpHandle *hand = (cpHandle *)cpHashSetRemove(hash.handleSet, hashid, obj)
-  
-  if(hand){
-    hand.obj = NULL
-    cpHandleRelease(hand, hash.pooledHandles)
+func (hash * SpaceHash) Remove(obj * HashElement,  hashid HashValue) {
+  hand := hash.handlSet.Remove(hashid, obj)  
+  if hand != nil {
+    hand.obj = nil
+    hand.Release(hash.pooledHandles)
   }
 }
 

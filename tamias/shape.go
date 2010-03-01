@@ -196,7 +196,6 @@ cpSegmentQueryInfoPrint(cpSegmentQueryInfo *info)
 
 
 
-
 func CircleShapeAlloc() (* cpCircleShape) {
 	return &cpCircleShape{};
 }
@@ -218,8 +217,7 @@ func (circle * Circle) PointQuery(cpVect p) (bool) {
 
 
 
-func (circle * Circle) SegmentQuery(center Vect, r Float, a, b Vect) (info * SegmentQueryInfo)
-{
+func CircleSegmentQuery(shape *Shape, center Vect, r Float, a, b Vect) (info * SegmentQueryInfo) {
 	// umm... gross I normally frown upon such things (sic)
 	aa := a.Sub(center);
 	bb := b.Sub(center);
@@ -238,6 +236,12 @@ func (circle * Circle) SegmentQuery(center Vect, r Float, a, b Vect) (info * Seg
 			info->n = a.Lerp(b, t).Normalize()
 		}
 	}
+  return info 
+}
+
+
+func (circle * Circle) SegmentQuery(a, b Vect) (info * SegmentQueryInfo) {
+  return CircleSegmentQuery(circle, circle.c, cicle.r, a, b)
 }
 
 const CircleShapeClass = ShapeClass { CP_CIRCLE_SHAPE }
@@ -250,212 +254,193 @@ func (circle * CircleShape) Init(cpBody *body, cpFloat radius, cpVect offset) (*
 	return circle;
 }
 
-/*
-cpShape *
-cpCircleShapeNew(cpBody *body, cpFloat radius, cpVect offset)
-{
-	return (cpShape *)cpCircleShapeInit(cpCircleShapeAlloc(), body, radius, offset);
+
+func CircleShapeNew(radius Float, offset Vect) (*CircleShape) {
+  return CircleShapeAlloc().Init(radius, offset)
 }
 
-CP_DefineShapeGetter(cpCircleShape, cpVect, c, Offset)
-CP_DefineShapeGetter(cpCircleShape, cpFloat, r, Radius)
-
-cpSegmentShape *
-cpSegmentShapeAlloc(void)
-{
-	return (cpSegmentShape *)cpcalloc(1, sizeof(cpSegmentShape));
+func (circle * CircleShape) Radius() (Float) {
+  return circle.radius
 }
 
-static cpBB
-cpSegmentShapeCacheData(cpShape *shape, cpVect p, cpVect rot)
-{
-	cpSegmentShape *seg = (cpSegmentShape *)shape;
-	
-	seg->ta = cpvadd(p, cpvrotate(seg->a, rot));
-	seg->tb = cpvadd(p, cpvrotate(seg->b, rot));
-	seg->tn = cpvrotate(seg->n, rot);
-	
-	cpFloat l,r,s,t;
-	
-	if(seg->ta.x < seg->tb.x){
-		l = seg->ta.x;
-		r = seg->tb.x;
-	} else {
-		l = seg->tb.x;
-		r = seg->ta.x;
-	}
-	
-	if(seg->ta.y < seg->tb.y){
-		s = seg->ta.y;
-		t = seg->tb.y;
-	} else {
-		s = seg->tb.y;
-		t = seg->ta.y;
-	}
-	
-	cpFloat rad = seg->r;
-	return cpBBNew(l - rad, s - rad, r + rad, t + rad);
+func (circle * CircleShape) Offset() (Vect) {
+  return circle.offset
 }
 
-static int
-cpSegmentShapePointQuery(cpShape *shape, cpVect p){
-	if(!cpBBcontainsVect(shape->bb, p)) return 0;
-	
-	cpSegmentShape *seg = (cpSegmentShape *)shape;
-	
-	// Calculate normal distance from segment.
-	cpFloat dn = cpvdot(seg->tn, p) - cpvdot(seg->ta, seg->tn);
-	cpFloat dist = cpfabs(dn) - seg->r;
-	if(dist > 0.0f) return 0;
-	
-	// Calculate tangential distance along segment.
-	cpFloat dt = -cpvcross(seg->tn, p);
-	cpFloat dtMin = -cpvcross(seg->tn, seg->ta);
-	cpFloat dtMax = -cpvcross(seg->tn, seg->tb);
-	
-	// Decision tree to decide which feature of the segment to collide with.
-	if(dt <= dtMin){
-		if(dt < (dtMin - seg->r)){
-			return 0;
-		} else {
-			return cpvlengthsq(cpvsub(seg->ta, p)) < (seg->r*seg->r);
-		}
-	} else {
-		if(dt < dtMax){
-			return 1;
-		} else {
-			if(dt < (dtMax + seg->r)) {
-				return cpvlengthsq(cpvsub(seg->tb, p)) < (seg->r*seg->r);
-			} else {
-				return 0;
-			}
-		}
-	}
-	
-	return 1;	
+func SegmentShapeAlloc() (*SegmentShape) {
+  return &SegmentShape{}
 }
 
-static void
-cpSegmentShapeSegmentQuery(cpShape *shape, cpVect a, cpVect b, cpSegmentQueryInfo *info)
-{
-	cpSegmentShape *seg = (cpSegmentShape *)shape;
-	cpVect n = seg->tn;
-	// flip n if a is behind the axis
-	if(cpvdot(a, n) < cpvdot(seg->ta, n))
-		n = cpvneg(n);
-	
-	cpFloat an = cpvdot(a, n);
-	cpFloat bn = cpvdot(b, n);
-	cpFloat d = cpvdot(seg->ta, n) + seg->r;
-	
-	cpFloat t = (d - an)/(bn - an);
-	if(0.0f < t && t < 1.0f){
-		cpVect point = cpvlerp(a, b, t);
-		cpFloat dt = -cpvcross(seg->tn, point);
-		cpFloat dtMin = -cpvcross(seg->tn, seg->ta);
-		cpFloat dtMax = -cpvcross(seg->tn, seg->tb);
-		
-		if(dtMin < dt && dt < dtMax){
-			info->shape = shape;
-			info->t = t;
-			info->n = n;
-			
-			return; // don't continue on and check endcaps
-		}
-	}
-	
-	if(seg->r) {
-		cpSegmentQueryInfo info1; info1.shape = NULL;
-		cpSegmentQueryInfo info2; info2.shape = NULL;
-		circleSegmentQuery(shape, seg->ta, seg->r, a, b, &info1);
-		circleSegmentQuery(shape, seg->tb, seg->r, a, b, &info2);
-		
-		if(info1.shape && !info2.shape){
-			(*info) = info1;
-		} else if(info2.shape && !info1.shape){
-			(*info) = info2;
-		} else if(info1.shape && info2.shape){
-			if(info1.t < info2.t){
-				(*info) = info1;
-			} else {
-				(*info) = info2;
-			}
-		}
-	}
+(seg * SegmentShape) CacheBB(p, rot Vect) (BB) {
+  l, r, s, t Float
+  
+  seg.ta = p.Add(seg.a.Rotate(rot));
+  seg.tb = p.Add(seg.b.Rotate(rot));
+  seg.tn = p.Add(seg.n.Rotate(rot));
+    
+  if(seg.ta.x < seg.tb.x){
+    l = seg.ta.x
+    r = seg.tb.x
+  } else {
+    l = seg.tb.x
+    r = seg.ta.x
+  }
+  
+  if(seg.ta.y < seg.tb.y){
+    s = seg.ta.y
+    t = seg.tb.y
+  } else {
+    s = seg.tb.y
+    t = seg.ta.y
+  }
+  
+  rad := seg->r
+  return BBNew(l - rad, s - rad, r + rad, t + rad)
 }
 
-static const cpShapeClass cpSegmentShapeClass = {
-	CP_SEGMENT_SHAPE,
-	cpSegmentShapeCacheData,
-	NULL,
-	cpSegmentShapePointQuery,
-	cpSegmentShapeSegmentQuery,
-};
-
-cpSegmentShape *
-cpSegmentShapeInit(cpSegmentShape *seg, cpBody *body, cpVect a, cpVect b, cpFloat r)
-{
-	seg->a = a;
-	seg->b = b;
-	seg->n = cpvperp(cpvnormalize(cpvsub(b, a)));
-	
-	seg->r = r;
-	
-	cpShapeInit((cpShape *)seg, &cpSegmentShapeClass, body);
-	
-	return seg;
-}
-
-cpShape*
-cpSegmentShapeNew(cpBody *body, cpVect a, cpVect b, cpFloat r)
-{
-	return (cpShape *)cpSegmentShapeInit(cpSegmentShapeAlloc(), body, a, b, r);
-}
-
-CP_DefineShapeGetter(cpSegmentShape, cpVect, a, A)
-CP_DefineShapeGetter(cpSegmentShape, cpVect, b, B)
-CP_DefineShapeGetter(cpSegmentShape, cpVect, n, Normal)
-CP_DefineShapeGetter(cpSegmentShape, cpFloat, r, Radius)
-
-// Unsafe API (chipmunk_unsafe.h)
-
-void
-cpCircleShapeSetRadius(cpShape *shape, cpFloat radius)
-{
-	cpAssert(shape->klass == &cpCircleShapeClass, "Shape is not a circle shape.");
-	cpCircleShape *circle = (cpCircleShape *)shape;
-	
-	circle->r = radius;
-}
-
-void
-cpCircleShapeSetOffset(cpShape *shape, cpVect offset)
-{
-	cpAssert(shape->klass == &cpCircleShapeClass, "Shape is not a circle shape.");
-	cpCircleShape *circle = (cpCircleShape *)shape;
-	
-	circle->c = offset;
-}
-
-void
-cpSegmentShapeSetEndpoints(cpShape *shape, cpVect a, cpVect b)
-{
-	cpAssert(shape->klass == &cpSegmentShapeClass, "Shape is not a segment shape.");
-	cpSegmentShape *seg = (cpSegmentShape *)shape;
-	
-	seg->a = a;
-	seg->b = b;
-	seg->n = cpvperp(cpvnormalize(cpvsub(b, a)));
-}
-
-void
-cpSegmentShapeSetRadius(cpShape *shape, cpFloat radius)
-{
-	cpAssert(shape->klass == &cpSegmentShapeClass, "Shape is not a segment shape.");
-	cpSegmentShape *seg = (cpSegmentShape *)shape;
-	
-	seg->r = radius;
+(seg * SegmentShape) PointQuery(p Vect) (bool) {
+  if !seg.bb.ContainsVect(p) { 
+    return false 
+  } 
+   
+  // Calculate normal distance from segment.
+  dn    := seg.tn.Dot(p) - seg.ta.Dot(seg.tn)
+  dist  := dn.Abs()      - seg.r
+  if dist > 0.0 { 
+    return false 
+  }
+  
+  // Calculate tangential distance along segment.
+  dt    := - seg.tn.Cross(p)
+  dtMin := - seg.tn.Cross(seg.ta)     
+  dtMax := - seg.tn.Cross(seg.tb)
+  
+  // Decision tree to decide which feature of the segment to collide with.
+  if dt <= dtMin {
+    if dt < (dtMin - seg->r) {
+      return false
+    } else {
+      return seg.ta.Sub(p).Lengthsq() < (seg.r * seg.r) 
+    }
+  } else {
+    if dt < dtMax {
+      return true;
+    } else {
+      if dt < (dtMax + seg->r) {
+        return seg.tb.Sub(p).Lengthsq() < (seg.r * seg.r)
+      } else {
+        return false
+      }
+    }
+  }  
+  return true
 }
 
 
-*/
+func (segment * SegmentShape) SegmentQuery(center Vect, a, b Vect) (info * SegmentQueryInfo) {
+  
+  n := seg.tn;
+  // flip n if a is behind the axis
+  if a.Dot(n) < seg.ta.Dot(n) { 
+    n := n.Neg()
+  }  
+  
+  info = &SegmentQueryInfo{}
+  an  := a.Dot(n)
+  bn  := b.Dot(n)
+  d   := seg.ta.Dot(n) + seg.r
+  t   := (d - an)/(bn - an)
+  
+  if  Float(0.0) < t && t < Float(1.0f) {
+    
+    point := a.Lerp(b,t)
+    dt    := - seg.tn.Cross(point)
+    dtMin := - seg.tn.Cross(seg.ta)
+    dtMax := - seg.tn.Cross(seg.tb)
+        
+    if(dtMin < dt && dt < dtMax){
+      info.shape = shape;
+      info.t = t;
+      info.n = n;
+      
+      return info; // don't continue on and check endcaps
+    }
+  }
+  
+  if seg.r {
+    info1 := circleSegmentQuery(shape, seg->ta, seg->r, a, b)
+    info2 := circleSegmentQuery(shape, seg->tb, seg->r, a, b)
+    
+    if info1.shape && !info2.shape {
+      info = info1
+    } else if info2.shape && !info1.shape {
+      info = info2
+    } else if info1.shape && info2.shape {
+      if info1.t < info2.t {
+        info = info1;
+      } else {
+        info = info2;
+      }
+    }
+  }
+  // return empty info
+  return info 
+}
+
+
+var SegmentShapeClass = &ShapeClass {SEGMENT_SHAPE}
+
+func (seg *SegmentShape) Init(body * Body, a, b Vect, r Float) (*SegmentShape) {
+  seg.a = a
+  seg.b = b
+  seg.n = b.Sub(a).Normalize().Perp()
+  seg.r = r;  
+  Shape.Init(seg, SegmentShapeClass, body)  
+  return seg;
+}
+
+func SegmentShapeNew(body * Body, a, b Vect, r Float) (*SegmentShape) {
+  SegmentShapeAlloc().Init(body, a, b, r)
+}
+
+func (seg * SegmentShape) A() (Vect) {
+  return seg.a
+}
+
+func (seg * SegmentShape) B() (Vect) {
+  return seg.b
+}
+
+func (seg * SegmentShape) Normal() (Vect) {
+  return seg.n
+}
+
+func (seg * SegmentShape) Radius() (Float) {
+  return seg.r
+}
+
+
+// Unsafe API 
+func (circle * CircleShape) SetRadius(r Float) (Float) {
+  circle.r = r
+  return circle.r
+}
+
+func (circle * CircleShape) SetOffset(o Vect) (Vect) {
+  circle.c = o
+  return circle.c
+}
+
+
+func (seg * SegmentShape) Setendpoints(a, b Vect) {
+  seg.a = a
+  seg.b = b
+  seg.n = b.Sub(a).Normalize.Perp()
+}
+
+func (seg * SegmentShape) SetRadius(r Float) (Float) {
+  seg.r = r
+  return seg.r
+}
+
+

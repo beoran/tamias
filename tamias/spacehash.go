@@ -1,14 +1,14 @@
 package tamias
-import "container/vector"
+// import "container/vector"
 
 
 // The spatial hash is Chipmunk's default (and currently only) spatial 
 // index type.
 // Based on a chained hash table.
 
-interface SpaceHashElement {
+type SpaceHashElement interface  {
   GetBounds()(BB)
-} 
+}
 
 
 // Used internally to track objects added to the hash
@@ -24,12 +24,12 @@ type Handle struct {
 
 // Linked list element for in the chains.
 type SpaceHashBin struct {
-  handle Handle *
+  handle * Handle
   next * SpaceHashBin
 } 
 
 
-typedef struct cpSpaceHash{
+type SpaceHash struct {
   // Number of cells in the table.
   numcells int
   // Dimensions of the cells.
@@ -73,30 +73,29 @@ func SpaceHashAlloc() (*SpaceHash) {
   return &SpaceHash{}
 }
 
-func (hash * SpaceHash) AllocTable(int numcells) {
+func (hash * SpaceHash) AllocTable(numcells int) {
   hash.numcells = numcells
   hash.table = make([]*SpaceHashBin, numcells)
 } 
 
 // Equality function for the handleset.
 func (handle * Handle) Equals(other * Handle) (bool) {  
-  return (hand.obj == other.obj)
+  return (handle.obj == other.obj)
 }
 
 // Transformation function for the handleset.
-func (handle *Handle) handleSetTrans (hash * SpaceHash)
-{
+func (handle *Handle) handleSetTrans (hash * SpaceHash) {
   if(hash.pooledHandles.num == 0){
     // handle pool is exhausted, make more    
     count 	:= 100    
     buffer 	:= make([]Handle, count)
-    for int i=0; i<count; i++ { 
+    for i:=0; i<count; i++ { 
       hash.pooledHandles.Push(buffer[i])
     }  
   }
   
-  cpHandle *hand = cpHandleInit(cpArrayPop(hash.pooledHandles), obj)
-  cpHandleRetain(hand)
+  hand := hand.Init(hash.pooledHandles.Pop(), obj)
+  hand.Retain()
   
   return hand
 }
@@ -119,12 +118,12 @@ func SpaceHashNew(celldim Float, numcells int) (* SpaceHash) {
   return SpaceHashAlloc().Init(celldim, numcells)
 }
 
-func (hash * SpaceHash) recycleBin(SpaceHashBin *bin) {
+func (hash * SpaceHash) recycleBin(bin *SpaceHashBin) {
   bin.next 	  = hash.pooledBins
   hash.pooledBins = bin
 }
 
-func (hash * SpaceHash) clearHashCell(int idx) {
+func (hash * SpaceHash) clearHashCell(idx int) {
   bin := hash.table[idx]
   for bin { 
     next := bin.next
@@ -137,7 +136,7 @@ func (hash * SpaceHash) clearHashCell(int idx) {
 
 // Clear all cells in the hashtable.
 func (hash * SpaceHash) clearHash() { 
-  for int i=0; i<hash.numcells; i++ {  
+  for i:=0; i<hash.numcells; i++ {  
     hash.clearHashCell(i)
   }  
 }
@@ -166,14 +165,14 @@ func (hash * SpaceHash) Resize(celdim Float, numcells int) {
 // Return true if the chain contains the handle.
 func (bin *SpaceHashBin) containsHandle(hand *Handle) (bool) {
   if bin != nil {
-    if (bin.handle == hand) return true
+    if (bin.handle == hand) { return true }
     bin = bin.next
   }  
   return false
 }
 
 // Get a recycled or new bin.
-func (hash * SpaceHashBin) getEmptyBin() (bin * SpaceHashBin) {
+func (hash * SpaceHashBin) getEmptyBin() (* SpaceHashBin) {
   bin := hash.pooledBins
   
   if bin != nil {
@@ -200,7 +199,7 @@ func hash_func(x, y, n HashValue) (HashValue) {
 // Much faster than (int)floor(f)
 // Profiling showed floor() to be a sizable performance hog
 // XXX: check this for golang.
-func (Float f) floor_int() (int) {                                 
+func (f Float) floor_int() (int) {                                 
   i := int(f)
   if f < Float(0.0) && f != Float(i) { 
     return i - 1
@@ -220,7 +219,7 @@ func (hash * SpaceHash)cellDimensions(bb BB)(int, int, int, int) {
 }
 
 
-func (hash * SpaceHash) hashHandle(hand * Handle, bb BB) 
+func (hash * SpaceHash) hashHandle(hand * Handle, bb BB) { 
   // Find the dimensions in cell coordinates.
   l, r, b, t := hash.cellDimensions(bb)
   n := hash.numcells
@@ -242,8 +241,8 @@ func (hash * SpaceHash) hashHandle(hand * Handle, bb BB)
   }
 }
 
-func (hash * SpaceHash) Insert(hand * Handle, obj * HashElement,  bb BB) {
-  hand := hash.handleSet.Insert(hashid, obj, hash)
+func (hash * SpaceHash) InsertHandle(hand * Handle, obj * HashElement,  bb BB) {
+  hand = hash.handleSet.Insert(hashid, obj, hash)
   hash.hashHandle(hand, bb)
 }
 
@@ -262,7 +261,7 @@ func handleRehashHelper(hand * Handle, hash * SpaceHash) {
   hash.hashHandle(hash, hand, hand.obj.GetBB())
 }
 
-func (cpSpaceHash *hash) Rehash() {
+func (hash * SpaceHash) Rehash() {
   clearHash(hash)  
   // Rehash all of the handles.
   hash.handleSet.Each(handleRehashHelper, hash)
@@ -275,6 +274,10 @@ func (hash * SpaceHash) Remove(obj * HashElement,  hashid HashValue) {
     hand.Release(hash.pooledHandles)
   }
 }
+
+
+
+type SpaceHashIterator func(a, b *HashElement)
 
 // Used by the cpSpaceHashEach() iterator.
 type eachPair struct {
@@ -295,7 +298,7 @@ func (hash *SpaceHash) Each(fun SpaceHashIterator, data * HashElement) {
 }
 // Calls the callback function for the objects in a given chain.
 func (hash *SpaceHash) query(bin * SpaceHashBin, obj * HashElement, 				
-      fun SpaceHashQueryFunc, obj * HashElement) {
+      fun SpaceHashQueryFunc, data * HashElement) {
   for ; bin ; bin = bin.next {
     hand 	:= bin.handle
     other 	:= hand.obj    
@@ -332,7 +335,7 @@ func (hash * SpaceHash) SpaceQuery(obj * HashElement, bb cpBB,
   
   // Iterate over the cells and query them.
   for i:=l ; i<=r; i++ {
-    for int j := b; j<=t; j++ {
+    for j := b; j<=t; j++ {
       idx := hash_func(i, j, n)
       query(hash, hash.table[idx], obj, fun, data)
     }
@@ -361,121 +364,114 @@ func handleQueryRehashHelper(hand * Handle, pair * queryRehashPair) {
   bb 	:= obj.GetBB()
   l, r, b, t := hash.cellDimensions(bb)
 
-  int l = floor_int(bb.l/dim)
-  int r = floor_int(bb.r/dim)
-  int b = floor_int(bb.b/dim)
-  int t = floor_int(bb.t/dim)
-
-  for(int i=l; i<=r; i++){
-    for(int j=b; j<=t; j++){
-//      // exit the loops if the object has been deleted in func().
+  for i:=l; i<=r; i++ {
+    for  j:=b; j<=t; j++ {
+//  // exit the loops if the object has been deleted in func().
 //      if(!hand.obj) goto break_out
       
-      int idx = hash_func(i,j,n)
-      cpSpaceHashBin *bin = hash.table[idx]
+      idx := hash_func(i, j, n)
+      bin := hash.table[idx]
       
-      if(containsHandle(bin, hand)) continue
+      if bin.containsHandle(hand) { continue  }      
+      hand.Retain() 
+      // this MUST be done first in case the object is removed in func()
+      query(hash, bin, obj, fun, pair.data)
       
-      cpHandleRetain(hand); // this MUST be done first in case the object is removed in func()
-      query(hash, bin, obj, func, pair.data)
-      
-      cpSpaceHashBin *newBin = getEmptyBin(hash)
-      newBin.handle = hand
-      newBin.next = bin
-      hash.table[idx] = newBin
+      newBin 	       := hash.getEmptyBin()
+      newBin.handle 	= hand
+      newBin.next 	= bin
+      hash.table[idx] 	= newBin
     }
-  }
-  
-//  break_out:
+  }  
+  //  break_out:
   // Increment the stamp for each object we hash.
   hash.stamp++
 }
 
-void
-cpSpaceHashQueryRehash(cpSpaceHash *hash, cpSpaceHashQueryFunc func, void *data)
-{
-  clearHash(hash)
-  
-  queryRehashPair pair = {hash, func, data}
-  cpHashSetEach(hash.handleSet, &handleQueryRehashHelper, &pair)
+func (hash * SpaceHash) Rehash(fun SpaceHashQueryFunc, data * HashElement) {
+  hash.clearHash()  
+  pair := queryRehashPair{hash, fun, data}
+  hash.handlset.Each(&handleQueryRehashHelper, &pair)
 }
 
-static inline cpFloat
-segmentQuery(cpSpaceHash *hash, cpSpaceHashBin *bin, void *obj, cpSpaceHashSegmentQueryFunc func, void *data)
-{
-  cpFloat t = 1.0f
+type SpaceHashSegmentQueryFunc func (obj, other, data *HashElement) 
+
+
+func (hash * SpaceHash) segmentQuery(obj * HashElement, 
+  fun SpaceHashSegmentQueryFunc, data * HashElement) (Float) {
+  
+  t = Float(1.0)
    
-  for(; bin; bin = bin.next){
-    cpHandle *hand = bin.handle
-    void *other = hand.obj
+  for ; bin; bin = bin.next {
+    hand := bin.handle
+    other := hand.obj
     
     // Skip over certain conditions
-    if(
+    if hand.stamp == hash.stamp || other == nil { continue; }
       // Have we already tried this pair in this query?
-      hand.stamp == hash.stamp
-      // Has other been removed since the last rehash?
-      || !other
-      ) continue
-    
+      // Has other been removed since the last rehash?    
     // Stamp that the handle was checked already against this object.
     hand.stamp = hash.stamp
-    
-    t = cpfmin(t, func(obj, other, data))
+    t = t.Min(fun(obj, other, data))    
   }
-  
   return t
 }
 
 // modified from http://playtechs.blogspot.com/2007/03/raytracing-on-grid.html
-void cpSpaceHashSegmentQuery(cpSpaceHash *hash, void *obj, cpVect a, cpVect b, cpFloat t_exit, cpSpaceHashSegmentQueryFunc func, void *data)
-{
-  a = cpvmult(a, 1.0f/hash.celldim)
-  b = cpvmult(b, 1.0f/hash.celldim)
+func (hash * SpaceHash) SegmentQuery(obj * HashElement, a, b Vect, t_exit Float, 			fun SpaceHashSegmentQueryFunc, data * HashElement) {
+  a = a.Mult(Float(1.0)/hash.celldim)
+  b = b.Mult(Float(1.0)/hash.celldim)
   
-  cpFloat dt_dx = 1.0f/cpfabs(b.x - a.x), dt_dy = 1.0f/cpfabs(b.y - a.y)
+  dt_dx  := Float(1.0)/((b.x - a.x).Abs())
+  dt_dy  := Float(1.0)/((b.y - a.y).Abs())
+  cell_x := floor_int(a.x) 
+  cell_y := floor_int(a.y)
+  t 	 := 0
   
-  int cell_x = floor_int(a.x), cell_y = floor_int(a.y)
+  var x_inc	, y_inc int
+  var temp_v, temp_h Float
 
-  cpFloat t = 0
-
-  int x_inc, y_inc
-  cpFloat temp_v, temp_h
-
-  if (b.x > a.x){
-    x_inc = 1
-    temp_h = (cpffloor(a.x + 1.0f) - a.x)
+  if b.x > a.x {
+    x_inc  = 1
+    temp_h = (a.x + Float(1.0)).Floor() - a.x
   } else {
-    x_inc = -1
-    temp_h = (a.x - cpffloor(a.x))
+    x_inc  = -1
+    temp_h = a.x - a.x.Floor()
   }
 
-  if (b.y > a.y){
-    y_inc = 1
-    temp_v = (cpffloor(a.y + 1.0f) - a.y)
+  if b.y > a.y {
+    y_inc  = 1
+    temp_v = (a.y + Float(1.0)).Floor() - a.y
   } else {
     y_inc = -1
-    temp_v = (a.y - cpffloor(a.y))
+    temp_v = a.y - a.y.Floor()
   }
   
   // fix NANs in horizontal directions
-  cpFloat next_h = (temp_h ? temp_h*dt_dx : dt_dx)
-  cpFloat next_v = (temp_v ? temp_v*dt_dy : dt_dy)
+  next_h := dt_dx
+  if temp_h != 0.0 { 
+    next_h = temp_h*dt_dx
+  }
+  
+  next_v := dt_dy
+  if temp_v != 0.0 { 
+    next_v = temp_v*dt_dy
+  }
 
-  int n = hash.numcells
-  while(t < t_exit){
-    int idx = hash_func(cell_x, cell_y, n)
-    t_exit = cpfmin(t_exit, segmentQuery(hash, hash.table[idx], obj, func, data))
-
+  n := hash.numcells
+  for t < t_exit {
+    idx := hash_func(cell_x, cell_y, n)
+    t_exit = t_exit.Min(hash.segmentQuery(hash.table[idx], obj, fun, data))
+    
     if (next_v < next_h){
       cell_y += y_inc
-      t = next_v
+      t       = next_v
       next_v += dt_dy
     } else {
       cell_x += x_inc
-      t = next_h
+      t       = next_h
       next_h += dt_dx
     }
-  }
-  
+  }  
   hash.stamp++
 }

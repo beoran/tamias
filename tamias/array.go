@@ -5,7 +5,7 @@ type ArrayElement interface {}
 
 type Array struct{
   num, max int
-  arr []*ArrayElement
+  arr []ArrayElement
 } 
 
 func ArrayAlloc() (*Array) {
@@ -16,7 +16,7 @@ func (arr * Array) Init(size int)  (*Array) {
   arr.num = 0
   if size < 4 { size    =  4; }
   arr.max = size
-  arr.arr = make([]*ArrayElement, size)  
+  arr.arr = make([]ArrayElement, size)
   return arr
 }
 
@@ -32,20 +32,19 @@ func (arr * Array) Free()  {
   arr.Destroy()
 }
 
-func (arr * Array) Push(object * ArrayElement)  {
+func (arr * Array) Push(object ArrayElement)  {
   if(arr.num == arr.max){
     arr.max *= 2
-    newarr  := make([]*ArrayElement, arr.max)
-    for i:= 0; i < len(arr.arr) ; i++ {
-      newarr[i] = arr.arr[i]
-    }    
-    arr.arr = newarr     
+    newarr  := make([]ArrayElement, arr.max)
+    // copy old to new 
+    copy(newarr, arr.arr) 
+    arr.arr = newarr
   }
   arr.arr[arr.num] = object
   arr.num++  
 }
 
-func (arr * Array) Pop() (object * ArrayElement) {
+func (arr * Array) Pop() (object ArrayElement) {
   arr.num--
   
   value := arr.arr[arr.num]
@@ -60,7 +59,7 @@ func (arr * Array) DeleteIndex(idx int) {
   arr.arr[arr.num]  = nil
 }
 
-func (arr * Array) DeleteObj(obj * ArrayElement) { 
+func (arr * Array) DeleteObj(obj ArrayElement) { 
   for i:=0; i<arr.num; i++ {
     if arr.arr[i] == obj {
       arr.DeleteIndex(i)
@@ -78,7 +77,7 @@ cpArrayEach(cpArray *arr, cpArrayIter iterFunc, void *data)
 }
 */
 
-func (arr * Array) Contains(obj * ArrayElement) (bool) { 
+func (arr * Array) Contains(obj ArrayElement) (bool) { 
   for i:=0; i<arr.num; i++ {
     if arr.arr[i] == obj {      
       return true

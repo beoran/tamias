@@ -240,7 +240,20 @@ func (set * HashSet) Find(hash HashValue, ptr * HashElement) (* HashElement) {
   return set.default_value
 }
 
- 
+type HashSetIterFunc func(bin, data *HashElement) 
+
+func (set * HashSet) Each(fun HashSetIterFunc, data * HashElement) { 
+  for i:=0 ; i<set.size ; i++ {
+    bin := set.table[i];
+    for bin != nil {
+      next := bin.next;
+      fun(bin.elt, data);
+      bin = next;
+    }
+  }
+}
+
+type HashSetFilterFunc func(bin, data *HashElement) (bool)
 
 /* 
 XXX: how to iterate and filter? 

@@ -208,7 +208,7 @@ func (Float f) floor_int() (int) {
   return i 
 }
 
-func (hash * SpaceHash) hashHandle(hand * Handle, bb BB) 
+func (hash * SpaceHash)cellDimensions(bb BB)(int, int, int, int) {
   // Find the dimensions in cell coordinates.
   dim 	:= hash.celldim
   // Fix by ShiftZ
@@ -216,7 +216,13 @@ func (hash * SpaceHash) hashHandle(hand * Handle, bb BB)
   r := floor_int(bb.r / dim)
   b := floor_int(bb.b / dim)
   t := floor_int(bb.t / dim)
-  
+  return l, r, b, t
+}
+
+
+func (hash * SpaceHash) hashHandle(hand * Handle, bb BB) 
+  // Find the dimensions in cell coordinates.
+  l, r, b, t := hash.cellDimensions(bb)
   n := hash.numcells
   for  i:=l ;  i<=r; i++ {
     for j:=b ; j<=t ; j++ {
@@ -271,116 +277,89 @@ func (hash * SpaceHash) Remove(obj * HashElement,  hashid HashValue) {
 }
 
 // Used by the cpSpaceHashEach() iterator.
-typedef struct eachPair {
-  cpSpaceHashIterator func
-  void *data
-} eachPair
+type eachPair struct {
+  fun 		SpaceHashIterator
+  data * 	HashElement
+}
 
 // Calls the user iterator function. (Gross I know.)
-static void
-eachHelper(void *elt, void *data)
-{
-  cpHandle *hand = (cpHandle *)elt
-  eachPair *pair = (eachPair *)data
-  
-  pair.func(hand.obj, pair.data)
+func eachHelper(hand * Handle, eachPair *data) {
+  pair.fun(hand.obj, pair.data)
 }
 
 // Iterate over the objects in the spatial hash.
-void
-cpSpaceHashEach(cpSpaceHash *hash, cpSpaceHashIterator func, void *data)
-{
+func (hash *SpaceHash) Each(fun SpaceHashIterator, data * HashElement) {
   // Bundle the callback up to send to the hashset iterator.
-  eachPair pair = {func, data}
-  
-  cpHashSetEach(hash.handleSet, &eachHelper, &pair)
+  pair := &eachPair{fun, data}  
+  hash.handleSet.Each(&eachHelper, &pair)
 }
-
 // Calls the callback function for the objects in a given chain.
-static inline void
-query(cpSpaceHash *hash, cpSpaceHashBin *bin, void *obj, cpSpaceHashQueryFunc func, void *data)
-{
-  for(; bin; bin = bin.next){
-    cpHandle *hand = bin.handle
-    void *other = hand.obj
-    
+func (hash *SpaceHash) query(bin * SpaceHashBin, obj * HashElement, 				
+      fun SpaceHashQueryFunc, obj * HashElement) {
+  for ; bin ; bin = bin.next {
+    hand 	:= bin.handle
+    other 	:= hand.obj    
     // Skip over certain conditions
-    if(
-      // Have we already tried this pair in this query?
-      hand.stamp == hash.stamp
-      // Is obj the same as other?
-      || obj == other 
-      // Has other been removed since the last rehash?
-      || !other
-      ) continue
-    
-    func(obj, other, data)
-
+    if hand.stamp == hash.stamp || obj == other || !other { continue } 
+    // Have we already tried this pair in this query?     
+    // Is obj the same as other?
+    // Has other been removed since the last rehash?    
+    fun(obj, other, data)
     // Stamp that the handle was checked already against this object.
     hand.stamp = hash.stamp
   }
 }
 
-void
-cpSpaceHashPointQuery(cpSpaceHash *hash, cpVect point, cpSpaceHashQueryFunc func, void *data)
-{
-  cpFloat dim = hash.celldim
-  int idx = hash_func(floor_int(point.x/dim), floor_int(point.y/dim), hash.numcells);  // Fix by ShiftZ
-  
-  query(hash, hash.table[idx], &point, func, data)
-
+func (hash * SpaceHash) PointQuery(point Vect, fun SpaceHashQueryFunc, 
+      data * HashElement) {      
+  dim := hash.celldim
+  xf  := floor_int(point.x/dim)
+  yf  := floor_int(point.y/dim)
+  hc  := hash.numcells
+  idx := hash_func(xf, yf , hc)  
+  // Fix by ShiftZ  
+  hash.query(hash.table[idx], &point, fun, data)
   // Increment the stamp.
   // Only one cell is checked, but query() requires it anyway.
   hash.stamp++
 }
 
-void
-cpSpaceHashQuery(cpSpaceHash *hash, void *obj, cpBB bb, cpSpaceHashQueryFunc func, void *data)
-{
+func (hash * SpaceHash) SpaceQuery(obj * HashElement, bb cpBB, 
+      fun SpaceHashQueryFunc, data * HashElement) {
   // Get the dimensions in cell coordinates.
-  cpFloat dim = hash.celldim
-  int l = floor_int(bb.l/dim);  // Fix by ShiftZ
-  int r = floor_int(bb.r/dim)
-  int b = floor_int(bb.b/dim)
-  int t = floor_int(bb.t/dim)
-  
-  int n = hash.numcells
+  l, r, b, t := hash.cellDimensions(bb)   
+  n := hash.numcells
   
   // Iterate over the cells and query them.
-  for(int i=l; i<=r; i++){
-    for(int j=b; j<=t; j++){
-      int idx = hash_func(i,j,n)
-      query(hash, hash.table[idx], obj, func, data)
+  for i:=l ; i<=r; i++ {
+    for int j := b; j<=t; j++ {
+      idx := hash_func(i, j, n)
+      query(hash, hash.table[idx], obj, fun, data)
     }
-  }
-  
+  }  
   // Increment the stamp.
   hash.stamp++
 }
 
 // Similar to struct eachPair above.
-typedef struct queryRehashPair {
-  cpSpaceHash *hash
-  cpSpaceHashQueryFunc func
-  void *data
-} queryRehashPair
+type queryRehashPair struct {
+  hash * cpSpaceHash
+  fun SpaceHashQueryFunc
+  data * HashElement
+} 
 
 // Hashset iterator func used with cpSpaceHashQueryRehash().
-static void
-handleQueryRehashHelper(void *elt, void *data)
-{
-  cpHandle *hand = (cpHandle *)elt
-  
-  // Unpack the user callback data.
-  queryRehashPair *pair = (queryRehashPair *)data
-  cpSpaceHash *hash = pair.hash
-  cpSpaceHashQueryFunc func = pair.func
+func handleQueryRehashHelper(hand * Handle, pair * queryRehashPair) {  
+  // Unpack the user callback data.  
+  hash 	:= pair.hash
+  fun  	:= pair.fun
 
-  cpFloat dim = hash.celldim
-  int n = hash.numcells
+  dim 	:= hash.celldim
+  n  	:= hash.numcells
 
-  void *obj = hand.obj
-  cpBB bb = hash.bbfunc(obj)
+  obj 	:= hand.obj
+  bb 	:= obj.GetBB()
+  l, r, b, t := hash.cellDimensions(bb)
 
   int l = floor_int(bb.l/dim)
   int r = floor_int(bb.r/dim)

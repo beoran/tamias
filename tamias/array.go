@@ -12,6 +12,7 @@ func ArrayAlloc() (*Array) {
   return &Array{}
 }
 
+
 func (arr * Array) Init(size int)  (*Array) {
   arr.num = 0
   if size < 4 { size    =  4; }
@@ -28,7 +29,16 @@ func (arr * Array) Destroy()  {
   arr.arr = nil
 }
 
-func (arr * Array) Free()  {
+func (arr * Array) Size() (int)  {
+  return arr.num
+}
+
+func (arr * Array) Index(i int) (ArrayElement) {
+  if i < 0 || i >= arr.max { return nil }
+  return arr.arr[i]
+}
+
+func (arr * Array) Free() {
   arr.Destroy()
 }
 

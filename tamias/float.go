@@ -3,8 +3,9 @@ package tamias
 //Float, a floating point type for Tamias, with some method sugar.
 
 import "math"
+import "fmt"
 
-type Float float;
+type Float float32;
 
 func F64Float(in float64) (Float) {
   return Float(in)
@@ -13,6 +14,15 @@ func F64Float(in float64) (Float) {
 func (self Float) Float64() (float64) {
   return float64(self)
 }
+
+func (self Float) Eqf(other float64) (bool) {
+  return self == Float(other)
+}
+
+func (self Float) Equals(other Float) (bool) {
+  return self == other
+}
+
 
 func (self Float) Sqrt() (Float) {
   return Float(math.Sqrt(self.Float64()))
@@ -98,4 +108,8 @@ func (a Float) VectForAngle() (Vect) {
 }
 
 var INFINITY = Float(math.Inf(1))
+
+func (self Float) String() (string) {
+  return fmt.Sprintf("%f", self)
+}
 

@@ -82,7 +82,7 @@ type Shape struct {
   // *** Internally Used Fields
   // Unique id used as the hash value.
   hashid HashValue
-} 
+}
 
 // Circle shape structure.
 type CircleShape struct {

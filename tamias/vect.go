@@ -41,7 +41,7 @@ func V(x Float, y Float) (Vect) {
   return result
 }
 
-func VF(y float, x float) (Vect) {
+func VF(x float, y float) (Vect) {
   return V(Float(x), Float(y))
 }
 

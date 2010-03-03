@@ -9,7 +9,7 @@ TARG=tamias
 # GOFILES:=constants.$(O).go
 
 GOFILES:=tamias.go array.go float.go bb.go hashset.go spacehash.go \
-body.go shape.go polyshape.go vect.go
+body.go shape.go polyshape.go vect.go util.go arbiter.go space.go 
 
 # CGO_CFLAGS:=-I/usr/local/include/opencv -I/usr/include/opencv
 

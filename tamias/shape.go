@@ -152,6 +152,10 @@ func (shape * Shape) CacheBB(p Vect, rot Vect) (BB) {
   return BBNew(p.X, p.Y, p.X, p.Y)
 }
 
+func (shape * Shape) GetBB() (*BB) {
+  return shape.BB
+}
+
 func (shape * Shape) Destroy() {
 }
 

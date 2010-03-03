@@ -5,7 +5,7 @@ import "exp/iterable"
 // Spacemap is an alternative implementation of the spacehash
 
 type SpaceMapElement interface{
-  GetBB() (BB)  
+  GetBB() (*BB)  
 }
 
 type SpaceMapKey int64
@@ -57,7 +57,7 @@ func space_hash(x, y, n int64) (SpaceMapKey) {
   return SpaceMapKey((x*1640531513 ^ y*2654435789) % n)
 }
 
-func (sm * SpaceMap) cellDimensions(bb BB) (int, int, int, int) {
+func (sm * SpaceMap) cellDimensions(bb * BB) (int, int, int, int) {
   // Find the dimensions in cell coordinates.
   dim 	:= sm.cellsize
   // Fix by ShiftZ  
@@ -75,7 +75,7 @@ func (sm * SpaceMap) Insert(el SpaceMapElement) (SpaceMapElement) {
   // the bounds box may be in several cells, so iterate over them
   for i := l ; i <= r ; i++ {
     for j := t ; j <= b ; j++ {
-      cell      := sm.PointQueryCell(i, j)
+      cell      := sm.FindPoint(i, j)
       old       := cell.Find(el)
       if old != nil { continue }
       // Already in this spatial cell. Move on to the next one 
@@ -86,8 +86,8 @@ func (sm * SpaceMap) Insert(el SpaceMapElement) (SpaceMapElement) {
   return el
 }
 
-// Looks up the SpaceMapCell that the point X and Y is in
-func (sm * SpaceMap) PointQueryCell(x, y int) (*SpaceMapCell) {
+// Looks up the SpaceMapCell that the point with coordinates X and Y is in.
+func (sm * SpaceMap) FindPoint(x, y int) (*SpaceMapCell) {
   xx := int64(x)
   yy := int64(y)
   hk := space_hash(xx, yy, int64(sm.numcells))
@@ -95,6 +95,25 @@ func (sm * SpaceMap) PointQueryCell(x, y int) (*SpaceMapCell) {
   return &cell
 }
 
+func (sm * SpaceMap) FindVect(p Vect) (*SpaceMapCell) {
+  return sm.FindPoint( int(p.X.Floor()), int(p.Y.Floor()) )
+}
+
+// Returns a vector wil all SpaveMapElements in the given bounds box.
+func (sm * SpaceMap) FindBB(bb *BB) (* vector.Vector) {
+  result := &vector.Vector{}
+  l, t, r, b := sm.cellDimensions(bb)
+  // the bounds box may be in several cells, so iterate over them
+  for i := l ; i <= r ; i++ {
+    for j := t ; j <= b ; j++ {
+      cell      := sm.FindPoint(i, j)
+      for found := range cell.Shapes.Iter() { 
+	result.Push(found)
+      }
+    }
+  }
+  return result
+}
 
 
 

@@ -50,6 +50,14 @@ func TestFloat() {
   assert(f1.Equals(10.0), "Float should equal it's initial value 10.0", f1)
 }
 
+func TestShape() {
+  body := tamias.BodyNew(10.0, 0.0)
+  box  := tamias.BoxShapeNew(body, 20.0, 30.0)
+  assert(box.GetBB() != nil, "Box must have a bounds box")
+  assert(box.GetBB().R == 30, "Box must have BB.R 30.0", box.GetBB().R)
+  assert(box.GetBB().B == 20, "Box must have BB.R 20.0", box.GetBB().B)
+}
+
 func TestVect() {  
   v1 := tamias.VF(3.0, 4.0)
   v2 := tamias.V(1.0, 0.0)
@@ -97,5 +105,6 @@ func main() {
   TestFloat()
   TestVect()  
   TestResults()
+  TestShape()
   
 }

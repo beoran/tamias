@@ -2,10 +2,10 @@ package tamias
 
 // HashSet uses a chained hashtable implementation.
 // Other than the transformation functions, there is nothing fancy going on.
-type HashValue int
+type HashValue int64
 
 type HashElement interface {
-  Equals(*HashElement) (bool)
+  Equals(interface {}) (bool)
   /*
   Iter() (*HashElement)
   Filter() (bool)
@@ -15,7 +15,7 @@ type HashElement interface {
 // cpHashSetBin's form the linked lists in the chained hash table.
 type HashSetBin struct {
   // Pointer to the element.
-  elt * HashElement
+  elt HashElement
   // Hash value of the element.
   hash HashValue
   // Next element in the chain.
@@ -47,7 +47,7 @@ type HashSet struct {
   
   // Default value returned by cpHashSetFind() when no element is found.
   // Defaults to NULL.
-  default_value * HashElement;
+  default_value HashElement;
   
   // The table and recycled bins
   table       []*HashSetBin
@@ -161,7 +161,7 @@ func (set *HashSet) hashIndex(hash HashValue) (HashValue) {
 }
 
 // Find the correct has bin for this element, or nil if not found
-func (set *HashSet) findBin(hash HashValue, ptr * HashElement) (*HashSetBin) {
+func (set *HashSet) findBin(hash HashValue, ptr HashElement) (*HashSetBin) {
   idx := set.hashIndex(hash)
   bin := set.table[idx]
   // Follow the chained elements in the bin until the element is equal
@@ -173,7 +173,7 @@ func (set *HashSet) findBin(hash HashValue, ptr * HashElement) (*HashSetBin) {
 
 // Find the correct has bin for this element, or nil if not found
 // Also returns the bin before the current bin
-func (set *HashSet) findBinPrev(hash HashValue, ptr * HashElement) (
+func (set *HashSet) findBinPrev(hash HashValue, ptr HashElement) (
 bin *HashSetBin, prev *HashSetBin) {
   idx := set.hashIndex(hash)
   prev = nil
@@ -188,7 +188,7 @@ bin *HashSetBin, prev *HashSetBin) {
 
   
 
-func (set * HashSet) Insert(hash HashValue, ptr * HashElement) (* HashElement) {
+func (set * HashSet) Insert(hash HashValue, ptr HashElement) (HashElement) {
   idx := set.hashIndex(hash)
   
   // Find the bin with the matching element.
@@ -216,7 +216,7 @@ func (set * HashSet) Insert(hash HashValue, ptr * HashElement) (* HashElement) {
   return bin.elt
 }  
 
-func (set * HashSet) Remove(hash HashValue, ptr * HashElement) (* HashElement) {
+func (set * HashSet) Remove(hash HashValue, ptr HashElement) (HashElement) {
   bin, prev := set.findBinPrev(hash, ptr)
   // Remove it if it exists.
   if bin != nil {
@@ -232,7 +232,7 @@ func (set * HashSet) Remove(hash HashValue, ptr * HashElement) (* HashElement) {
   return nil;
 }
 
-func (set * HashSet) Find(hash HashValue, ptr * HashElement) (* HashElement) {
+func (set * HashSet) Find(hash HashValue, ptr HashElement) (HashElement) {
   bin := set.findBin(hash, ptr)
   if bin != nil {
     return bin.elt 
@@ -240,9 +240,9 @@ func (set * HashSet) Find(hash HashValue, ptr * HashElement) (* HashElement) {
   return set.default_value
 }
 
-type HashSetIterFunc func(bin, data *HashElement) 
+type HashSetIterFunc func(bin, data HashElement) 
 
-func (set * HashSet) Each(fun HashSetIterFunc, data * HashElement) { 
+func (set * HashSet) Each(fun HashSetIterFunc, data HashElement) { 
   for i:=0 ; i<set.size ; i++ {
     bin := set.table[i];
     for bin != nil {
@@ -253,7 +253,7 @@ func (set * HashSet) Each(fun HashSetIterFunc, data * HashElement) {
   }
 }
 
-type HashSetFilterFunc func(bin, data *HashElement) (bool)
+type HashSetFilterFunc func(bin, data HashElement) (bool)
 
 /* 
 XXX: how to iterate and filter? 

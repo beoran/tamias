@@ -45,6 +45,12 @@ func VF(y float, x float) (Vect) {
   return V(Float(x), Float(y))
 }
 
+func (v1 Vect) Equals(o interface {}) (bool) {
+  v2, ok := o.(Vect)
+  if !ok { return false; }   
+  return (v1.X == v2.X) && (v1.Y == v2.Y) 
+}
+
 // non-inlined functions
 /*
 cpFloat cpvlength(const cpVect v);

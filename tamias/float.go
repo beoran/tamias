@@ -18,6 +18,10 @@ func (self Float) Sqrt() (Float) {
   return Float(math.Sqrt(self.Float64()))
 }
 
+func (self Float) Floor() (Float) {
+  return Float(math.Floor(self.Float64()))
+}
+
 
 func (a Float) Max(b Float) (Float) { 
   if a > b { 

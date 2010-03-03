@@ -20,7 +20,7 @@ func (arr * Array) Init(size int)  (*Array) {
   return arr
 }
 
-func (arr * Array) New(size int)  (*Array) {
+func ArrayNew(size int)  (*Array) {
   return ArrayAlloc().Init(size)
 }
 

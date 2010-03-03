@@ -18,6 +18,10 @@ func (self Float) Sqrt() (Float) {
   return Float(math.Sqrt(self.Float64()))
 }
 
+func (self Float) Exp() (Float) {
+  return Float(math.Exp(self.Float64()))
+}
+
 func (self Float) Floor() (Float) {
   return Float(math.Floor(self.Float64()))
 }

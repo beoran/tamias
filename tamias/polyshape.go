@@ -91,17 +91,15 @@ func (poly * PolyShape) CacheBB(p, rot Vect) (BB) {
   l = verts[0].X
   t = verts[0].Y
   b = verts[0].Y
+  bb := BBMake(l, t, r, b)
     
   // TODO do as part of cpPolyShapeTransformVerts?
   for i:=1; i < poly.numVerts; i++ {
-    v := verts[i]    
-    l = l.Min(v.X)
-    r = r.Max(v.X)    
-    b = b.Min(v.Y)
-    t = t.Max(v.Y)
-  }
+    v := verts[i]   
+    bb = bb.Expand(v)
+  }  
   
-  return BBNew(l, b, r, t)
+  return bb 
 }
 
 func (poly * PolyShape) Destroy() {
@@ -154,11 +152,14 @@ func (poly * PolyShape) SegmentQuery (a, b Vect) (info * SegmentQueryInfo) {
 var PolyClass = &ShapeClass{ POLY_SHAPE };
 
 // Validate checks if the polygon is winding correcty.
-func PolyShapeValidate(numVerts int, verts []Vect) (bool) {
-  for i:=0; i < numVerts; i++ {
+func PolyShapeValidate(verts []Vect) (bool) {
+  nverts := len(verts)  
+  for i:=0 ; i < nverts; i++ {
+    bi:= (i+1) % nverts;
+    ci:= (i+2) % nverts;
     a := verts[i];
-    b := verts[(i+1)%numVerts];
-    c := verts[(i+2)%numVerts];
+    b := verts[bi];
+    c := verts[ci];
     if b.Sub(a).Cross(c.Sub(b)) > Float(0.0) { 
       return false 
     }   
@@ -175,46 +176,48 @@ func (poly * PolyShape) GetVert(idx int) (Vect) {
   return poly.verts[idx]
 }
 
-func (poly * PolyShape) setUpVerts(numVerts int, verts []Vect, offset Vect) {
-  poly.numVerts = numVerts;
+func (poly * PolyShape) setUpVerts(verts []Vect, offset Vect) {
+  poly.numVerts = len(verts);
 
-  poly.verts    = make([]Vect, numVerts)
-  poly.tVerts   = make([]Vect, numVerts)
-  poly.axes     = make([]PolyShapeAxis, numVerts)
-  poly.tAxes    = make([]PolyShapeAxis, numVerts)
-  for i:=0 ; i < numVerts ; i++ {
+  poly.verts    = make([]Vect, poly.numVerts)
+  poly.tVerts   = make([]Vect, poly.numVerts)
+  poly.axes     = make([]PolyShapeAxis, poly.numVerts)
+  poly.tAxes    = make([]PolyShapeAxis, poly.numVerts)
+  nverts       := len(verts)
+  for i:=0 ; i < nverts ; i++ {
     a := offset.Add(verts[i])
-    b := offset.Add(verts[(i+1)%numVerts])
-    n := b.Sub(a).Perp().Normalize() 
+    bi:= (i+1) % nverts 
+    b := offset.Add(verts[bi])
+    n := b.Sub(a).Perp().Normalize()
     poly.verts[i]   = a;
     poly.axes[i].n  = n;
     poly.axes[i].d  = n.Dot(a)
   }
 }
 
-func (poly * PolyShape) Init(body * Body, numVerts int, 
-      verts []Vect, offset Vect) (* PolyShape) { 
+func (poly * PolyShape) Init(body * Body, verts []Vect, 
+  offset Vect) (* PolyShape) { 
   // Fail if the user attempts to pass a concave poly, or a bad winding.
-  Assert(PolyShapeValidate(numVerts, verts), 
-    "Polygon is concave or has a reversed winding.")
-  
-  poly.setUpVerts(numVerts, verts, offset);
-  poly.Shape.Init(PolyClass, body);
-
+  Assert(PolyShapeValidate(verts), 
+    "Polygon is concave or has a reversed winding.")  
+  poly.setUpVerts(verts, offset);  
+  poly.Shape = ShapeNew(PolyClass, body) 
+  bb        := poly.CacheBB(body.p, body.rot)  
+  poly.BB    = &bb 
   return poly;
 }
 
-func PolyShapeNew(body * Body, numVerts int, verts []Vect, offset Vect) (
+func PolyShapeNew(body * Body, verts []Vect, offset Vect) (
   poly * PolyShape) {
-  return PolyShapeAlloc().Init(body, numVerts, verts, offset) 
+  return PolyShapeAlloc().Init(body, verts, offset) 
 }  
 
 func (poly * PolyShape) BoxInit(body * Body, width, height Float) (
       * PolyShape) {
-  hw     := width / Float(2.0)
-  hh     := width / Float(2.0)
+  hw     := width   / Float(2.0)
+  hh     := height  / Float(2.0)
   verts  := [4]Vect { V(-hw, -hh), V(-hw, hh), V(hw, hh), V(hw, -hh) }
-  poly.Init(body, 4, verts[0:3], VZERO)
+  poly.Init(body, (verts[0:len(verts)]), VZERO)
   return poly
 }  
 
@@ -225,6 +228,6 @@ func BoxShapeNew(body * Body, width, height Float) (poly * PolyShape) {
 // Unsafe API (chipmunk_unsafe.h)
 func (poly * PolyShape) SetVerts(numVerts int, verts []Vect, offset Vect) {
   poly.Destroy()
-  poly.setUpVerts(numVerts, verts, offset);
+  poly.setUpVerts(verts, offset);
 }
 

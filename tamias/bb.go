@@ -1,11 +1,14 @@
 package tamias
+import "fmt" 
 
 // Bounding box type
 type BB struct {
-  L, B, R, T Float
+  L, T, B, R Float
 }
 
-func BBNew(l, b, r, t Float) (BB) { 
+//BBMake returns a new bounds box with the given left, top, right, and bottom
+//coordinates  in that respective order.
+func BBMake(l, t, r, b Float) (BB) { 
   return BB{L: l, B: b, R: r, T: t}
 }
 
@@ -26,7 +29,7 @@ func (am BB) Merge(bm BB) (BB) {
   b := am.B.Min(bm.B)
   r := am.R.Max(bm.R)
   t := am.T.Max(bm.T)
-  return BBNew(l, b, r, t)
+  return BBMake(l, t, r, b)
 }
 
 func (bb BB) Expand(v Vect) (BB) {
@@ -34,8 +37,17 @@ func (bb BB) Expand(v Vect) (BB) {
   b := bb.B.Min(v.Y)
   r := bb.R.Max(v.X)
   t := bb.T.Max(v.Y)
-  return BBNew(l, b, r, t)
+  return BBMake(l, t, r, b)
 }
+
+func (bb BB) Grow(by Float) (BB) {
+  l := bb.L - by
+  b := bb.B - by
+  r := bb.R + by
+  t := bb.T + by
+  return BBMake(l, t, r, b)
+}
+
 
 // clamps the vector to lie within the bbox
 func (bb BB) ClampVect(v Vect) (Vect) {
@@ -62,3 +74,14 @@ func (bb BB) WrapVect(v Vect) (Vect) {
 	return V(x + bb.L, y + bb.B);
 }
 
+func (bb BB) String() (string) {
+  return fmt.Sprintf("[%.3f,%.3f|%.3f,%.3f]", bb.L, bb.T, bb.B, bb.R)  
+}
+
+/*
+func (bb * BB) String() string {
+  var str string
+  fmt.Sprintf(str, "BB [%f %f %f %f]", bb.L, bb.T, bb.R, bb.B) 
+  return str
+}
+*/

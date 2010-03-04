@@ -185,8 +185,6 @@ func (v Vect) ToAngle() (Float) {
 }
 
 func (v Vect) String() (string) {
-  var str string
-  fmt.Sprintf(str, "(% .3f, % .3f)", v.X, v.Y)
-  return str
+  return fmt.Sprintf("(%.3f, %.3f)", v.X, v.Y)  
 }
 

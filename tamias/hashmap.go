@@ -67,8 +67,8 @@ func (set * HashSet) Remove(hash HashValue, ptr HashElement) (HashElement) {
     // Update the previous bin next pointer to point to the next bin.
     if prev != nil { 
       prev.next = bin.next
-    }  
-    set.entries--    
+    }
+    set.entries--
     return_value := bin.elt
     set.recycleBin(bin)
     return return_value

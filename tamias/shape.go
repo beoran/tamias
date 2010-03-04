@@ -143,13 +143,16 @@ func (shape * Shape) Init(klass *ShapeClass, body *Body) (*Shape){
 	shape.collision_type 	= 0
 	shape.group 		= NO_GROUP
 	shape.layers 		= ALL_LAYERS
-	shape.data 		  = nil	
-	shape.CacheBB(body.p, body.rot)	
+	shape.data 		  = nil
 	return shape;
 }
 
+func ShapeNew(klass *ShapeClass, body *Body) (*Shape) {
+  return new(Shape).Init(klass, body)
+}
+
 func (shape * Shape) CacheBB(p Vect, rot Vect) (BB) {
-  return BBNew(p.X, p.Y, p.X, p.Y)
+  return BBMake(p.X, p.Y, p.X, p.Y)
 }
 
 func (shape * Shape) GetBB() (*BB) {
@@ -208,7 +211,7 @@ func CircleShapeAlloc() (* CircleShape) {
 
  
 func bbFromCircle(c Vect, r Float) (BB) {
-	return BBNew(c.X-r, c.Y-r, c.X+r, c.Y+r);
+	return BBMake(c.X-r, c.Y-r, c.X+r, c.Y+r);
 }
 
 func (circle * CircleShape) CacheBB(p Vect, rot Vect) (BB) {
@@ -300,7 +303,7 @@ func (seg * SegmentShape) CacheBB(p, rot Vect) (BB) {
   }
   
   rad := seg.r
-  return BBNew(l - rad, s - rad, r + rad, t + rad)
+  return BBMake(l - rad, s - rad, r + rad, t + rad)
 }
 
 func (seg * SegmentShape) PointQuery(p Vect) (bool) {

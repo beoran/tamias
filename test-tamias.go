@@ -3,6 +3,7 @@ package main
 import "fmt"
 import "os"
 import "tamias"
+import "exp/iterable"
 /*
 import "exp/draw"
 import "exp/draw/x11"
@@ -46,16 +47,43 @@ func TestResults() {
 
 func TestFloat() {
   f1 := tamias.Float(10.0)
+  f2 := tamias.Float(20.0)
   assert(f1 == 10.0, "Float should equal it's initial value 10.0", f1)
   assert(f1.Equals(10.0), "Float should equal it's initial value 10.0", f1)
+  assert(f1.Min(f2) == f1, "Min must work properly.", f1)
+  assert(f1.Max(f2) == f2, "Max must work properly.", f1)
+  assert(f2.Min(f1) == f1, "Min must work properly in reverse.", f1)
+  assert(f2.Max(f1) == f2, "Max must work properly in reverse.", f1)  
 }
+
+func TestBB() {
+  bb := tamias.BBMake(10.0, 20.0, 40.0, 80.0)  
+  // assert(bb != nil , "Bounds Box must be constructable")
+  assert(bb.L == 10.0, "Bounds Box L must be 10.0", bb.L)
+  assert(bb.T == 20.0, "Bounds Box T must be 20.0", bb.T)
+  assert(bb.R == 40.0, "Bounds Box R must be 40.0", bb.R)
+  assert(bb.B == 80.0, "Bounds Box B must be 80.0", bb.B)
+  b2 := bb.Grow(10.0)
+  assert(b2.Contains(bb), "Contains and grow work correctly.", bb, b2)
+}
+
 
 func TestShape() {
   body := tamias.BodyNew(10.0, 0.0)
-  box  := tamias.BoxShapeNew(body, 20.0, 30.0)
+  box  := tamias.BoxShapeNew(body, 20.0, 30.0)  
+  box.CacheBB(body.Pos(), body.Rot())
   assert(box.GetBB() != nil, "Box must have a bounds box")
-  assert(box.GetBB().R == 30, "Box must have BB.R 30.0", box.GetBB().R)
-  assert(box.GetBB().B == 20, "Box must have BB.R 20.0", box.GetBB().B)
+  if box.GetBB() != nil { 
+    // the object should have been placed at (0,0), so half the BB
+    // is positve and half negative
+    // chipmunk, and hence Tamias too, use a normal Carthesian 
+    // coordinate system where the zero is in the bottom left 
+    assert(box.Shape.BB == box.GetBB(), "BB and GetBB() are the same")  
+    assert(box.GetBB().L == -10.0, "Box must have BB.L -10.0", box.GetBB().L)
+    assert(box.GetBB().T == 15.0, "Box must have BB.T -15.0", box.GetBB().T)
+    assert(box.GetBB().R == 10.0, "Box must have BB.L 10.0", box.GetBB().R)
+    assert(box.GetBB().B == -15.0, "Box must have BB.T -15.0", box.GetBB().B)
+  }  
 }
 
 func TestVect() {  
@@ -75,6 +103,31 @@ func TestVect() {
   
   
 }
+
+func TestSpaceMap() {  
+  sm    := tamias.SpaceMapNew(10.0, 25)
+  body  := tamias.BodyNew(10.0, 0.0)
+  box   := tamias.BoxShapeNew(body, 20.0, 30.0)
+  assert(sm != nil, "SpaceMap should be constructable")
+  sm.Insert(box)
+  bb    := box.GetBB().Grow(10.0)
+  found := sm.FindBB(&bb)
+  assert(found != nil, "SpaceMap should find back inserted items.", bb)
+  if found != nil { 
+    block := func(el interface {})(bool) {
+      fmt.Println((el.(*tamias.PolyShape)))
+      return el.(*tamias.PolyShape) == box
+    } 
+    res  := iterable.Find(found, block)
+    assert(res != nil, "SpaceMap should find back the *right* inserted items.", found)
+  } else {
+    fmt.Printf(sm.String()) 
+    // fmt.Printf()
+  }  
+   
+  
+}
+
 
 type XHashEl string
 
@@ -104,7 +157,9 @@ func main() {
   */  
   TestFloat()
   TestVect()  
-  TestResults()
+  TestBB()  
   TestShape()
+  TestSpaceMap()
+  TestResults()
   
 }
